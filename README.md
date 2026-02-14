@@ -1,8 +1,8 @@
 # Pengolahan Citra Digital
 
-Latihan dan implementasi Digital Image Processing menggunakan C++23.
+Digital Image Processing exercises and implementations in C++23.
 
-## Referensi
+## Reference
 
 Gonzalez, R. C., & Woods, R. E. (2018). *Digital Image Processing* (4th ed.). Pearson.
 
@@ -29,7 +29,7 @@ direnv reload
 # compile all
 meson compile -C build
 
-# single execute compile
+# single exercise compile
 meson compile -C build imageinfo
 
 # example run
@@ -45,3 +45,7 @@ meson compile -C build imageinfo
 ## Tools
 
 `OpenCV 4.13.0` `spdlog` `Clang` `Meson`
+
+## Disclaimer
+
+Images used in this repository are not mine and are used for educational purposes only. All copyrights belong to their respective owners.
