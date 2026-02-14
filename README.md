@@ -1,6 +1,6 @@
 # Pengolahan Citra Digital
 
-Digital Image Processing exercises and implementations in C++23.
+Latihan dan implementasi PCD dengan C++23. Semester 4 rajin belajar.
 
 ## Books
 
@@ -33,13 +33,13 @@ meson compile -C build
 meson compile -C build tugas2
 
 # example run
-./build/exercises/imageinfo
+./build/tugas/tugas2
 ```
 
 ## Tugas
 
-| #   | Folder      | Tugas                                             |
-| --- | ----------- | ------------------------------------------------- |
+| #   | Folder   | Tugas                                             |
+| --- | -------- | ------------------------------------------------- |
 | 1   | `tugas2` | Menampilkan citra, resolusi (M×N), gray level (L) |
 
 ## Tools
