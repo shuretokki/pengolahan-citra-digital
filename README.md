@@ -2,7 +2,7 @@
 
 Digital Image Processing exercises and implementations in C++23.
 
-## Reference
+## Books
 
 Gonzalez, R. C., & Woods, R. E. (2018). *Digital Image Processing* (4th ed.). Pearson.
 
@@ -30,7 +30,7 @@ direnv reload
 meson compile -C build
 
 # single exercise compile
-meson compile -C build imageinfo
+meson compile -C build tugas2
 
 # example run
 ./build/exercises/imageinfo
@@ -40,7 +40,7 @@ meson compile -C build imageinfo
 
 | #   | Folder      | Tugas                                             |
 | --- | ----------- | ------------------------------------------------- |
-| 1   | `imageinfo` | Menampilkan citra, resolusi (M×N), gray level (L) |
+| 1   | `tugas2` | Menampilkan citra, resolusi (M×N), gray level (L) |
 
 ## Tools
 

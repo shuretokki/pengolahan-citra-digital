@@ -1,6 +1,6 @@
 executable(
-  'imageinfo',
-  'imageinfo/main.cpp',
+  'tugas2',
+  'tugas2/main.cpp',
   dependencies: [
     dependency('spdlog'),
     dependency('opencv4')

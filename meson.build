@@ -15,4 +15,4 @@ add_project_arguments(
   '-Wno-c11-extensions',
   language: 'cpp')
 
-subdir('exercises')
+subdir('tugas')
