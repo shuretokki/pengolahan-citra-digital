@@ -12,7 +12,7 @@ int main() {
   info("TODO[2]: display M x N");
   info("TODO[3]: display L");
 
-  cv::Mat img8 = cv::imread(assets + "golden.png", cv::IMREAD_UNCHANGED);
+  cv::Mat img8 = cv::imread(assets + "tugas2.png", cv::IMREAD_UNCHANGED);
   if (img8.empty()) {
     error("Image file not found");
     return -1;
