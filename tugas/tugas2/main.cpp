@@ -20,6 +20,7 @@ int main() {
       M (rows) x N (cols)
   *///
   print("{} x {}\n", img8.rows, img8.cols);
+  print("{} total pixels\n", img8.total());
 
   /*//
     (3); 2.4.1 quantization
@@ -39,7 +40,7 @@ int main() {
   *///
   print("{} byte or ", img8.elemSize1());
   print("{} bits per channel\n", img8.elemSize1() * 8);
-  print("{} totals", img8.total());
+  print("{} bytes each pixel\n", img8.elemSize());
 
   /*//
     channels();
