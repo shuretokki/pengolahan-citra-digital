@@ -19,15 +19,15 @@ int main() {
     (2); 2.4.1 sampling
       M (rows) x N (cols)
       M x N = total pixels;
-      M x N x b = bit raw sizes;
-      M x N x B = byte raw sizes;
+      M x N x k = bit raw sizes;
+      (M x N x k) / 8 = byte raw sizes;
       Where raw means it is uncompressed;
   *///
   print("{} x {}\n", img8.rows, img8.cols);
   print("{} total pixels\n", img8.total());
-  print("{}KB or {}Kb uncompressed sizes \n",
-        (img8.total() * img8.elemSize()) / 1000,
-        (img8.total() * img8.elemSize() * 8) / 1000);
+  print("{}KiB or {}Kib uncompressed sizes \n",
+        (img8.total() * img8.elemSize()) / 1024,
+        (img8.total() * img8.elemSize() * 8) / 1024);
 
   /*//
     elemSize1() return size of one color value;
