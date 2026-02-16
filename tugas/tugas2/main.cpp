@@ -9,9 +9,9 @@ using namespace spdlog;
 
 int main() {
   const std::string assets = ROOT "/common/assets/";
-  auto img8 = imread(assets + "tugas2.png", IMREAD_UNCHANGED);
+  auto img8 = imread(assets + "tugeas2.png", IMREAD_UNCHANGED);
   if (img8.empty()) {
-    error("Image file not found");
+    error("can't open or read file");
     return -1;
   }
 
