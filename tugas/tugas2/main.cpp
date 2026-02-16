@@ -60,6 +60,5 @@ int main() {
     if (waitKey(0) == 27)
       break;
 
-  cv::destroyAllWindows();
   return 0;
 }
