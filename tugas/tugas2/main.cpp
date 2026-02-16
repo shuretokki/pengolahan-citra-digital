@@ -54,6 +54,16 @@ int main() {
       Grayscale = IMREAD_GRAYSCALE = 1
       BGR = IMREAD_COLOR = 3
       BGRA = IMREAD_UNCHANGED (could be 1/3/4 tho) = 4
+
+    personal notes:
+      BGR is defined from the shorter wavelength order while
+      RGB is the opposites. So, channels access method for
+      each convention may vary.
+
+      in case i forget;
+      VBGYOR (430nm to 790nm) for BGR
+      or ROYGBV (~ opposite) for RGB,
+      might add Indigo for 7 colors.
   *///
   print("{} channels\n", img8.channels());
 
