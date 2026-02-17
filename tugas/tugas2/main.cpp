@@ -61,9 +61,7 @@ int main() {
       each convention may vary.
 
       in case i forget;
-      VBGYOR (430nm to 790nm) for BGR
-      or ROYGBV (~ opposite) for RGB,
-      might add Indigo for 7 colors.
+      VIBGYOR (430nm ~ 790nm; visible bands)
   *///
   print("{} channels\n", img8.channels());
 
