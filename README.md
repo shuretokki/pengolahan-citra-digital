@@ -2,10 +2,6 @@
 
 Latihan dan implementasi PCD dengan C++23. Semester 4 rajin belajar.
 
-## Books
-
-Gonzalez, R. C., & Woods, R. E. (2018). *Digital Image Processing* (4th ed.). Pearson.
-
 ## Setup
 
 ```bash
