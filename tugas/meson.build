@@ -5,6 +5,18 @@ executable(
     dependency('spdlog'),
     dependency('opencv4')
   ],
+  include_directories: inc,
+  install: true,
+)
+
+executable(
+  'tugas3',
+  'tugas3/main.cpp',
+  dependencies: [
+    dependency('spdlog'),
+    dependency('opencv4')
+  ],
+  include_directories: inc,
   install: true,
 )
 
@@ -15,5 +27,6 @@ executable(
     dependency('spdlog'),
     dependency('opencv4')
   ],
+  include_directories: inc,
   install: true,
 )

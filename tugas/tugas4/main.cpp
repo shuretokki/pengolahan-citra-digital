@@ -1,247 +1,401 @@
-#include "opencv2/core/hal/interface.h"
+#include "opencv2/core/saturate.hpp"
 #include "spdlog/spdlog.h"
+#include <numeric>
 #include <opencv2/opencv.hpp>
+#include <sciplot/sciplot.hpp>
 
 using namespace cv;
 using namespace spdlog;
+using namespace sciplot;
+
+int mirror(int i, int max) {
+  if (i < 0)
+    return -i;
+  if (i >= max)
+    return 2 * max - i - 2;
+  return i;
+}
+
+void processHistogram(const Mat &src, const std::string &out, int index) {
+  std::string suffix = "_" + std::to_string(index);
+  int totalPixels = src.rows * src.cols;
+
+  std::vector<int> h[3];
+  for (auto i = 0; i < 3; ++i)
+    h[i].assign(256, 0);
+  for (auto y = 0; y < src.rows; ++y) {
+    for (auto x = 0; x < src.cols; ++x) {
+      Vec3b p = src.at<Vec3b>(y, x);
+      h[0][p[0]]++;
+      h[1][p[1]]++;
+      h[2][p[2]]++;
+    }
+  }
+
+  double sum[3] = {0, 0, 0};
+  std::vector<uchar> lut[3];
+  for (auto i = 0; i < 3; ++i)
+    lut[i].resize(256);
+  for (int i = 0; i < 256; ++i) {
+    sum[0] += static_cast<double>(h[0][i]) / totalPixels;
+    sum[1] += static_cast<double>(h[1][i]) / totalPixels;
+    sum[2] += static_cast<double>(h[2][i]) / totalPixels;
+    lut[0][i] = saturate_cast<uchar>(255 * sum[0]);
+    lut[1][i] = saturate_cast<uchar>(255 * sum[1]);
+    lut[2][i] = saturate_cast<uchar>(255 * sum[2]);
+  }
+
+  Mat eq = src.clone();
+  for (auto y = 0; y < eq.rows; ++y) {
+    for (auto x = 0; x < eq.cols; ++x) {
+      Vec3b &p = eq.at<Vec3b>(y, x);
+      for (auto i = 0; i < 3; ++i)
+        p[i] = lut[i][p[i]];
+    }
+  }
+
+  std::vector<int> eqH[3];
+  for (auto i = 0; i < 3; ++i)
+    eqH[i].assign(256, 0);
+  for (auto y = 0; y < eq.rows; ++y) {
+    for (auto x = 0; x < eq.cols; ++x) {
+      Vec3b p = eq.at<Vec3b>(y, x);
+      eqH[0][p[0]]++;
+      eqH[1][p[1]]++;
+      eqH[2][p[2]]++;
+    }
+  }
+
+  std::vector<int> bins(256);
+  std::iota(bins.begin(), bins.end(), 0);
+
+  auto createPlot = [&](const std::vector<int> hist[3],
+                        const std::string &title) {
+    Plot2D p;
+    p.xlabel("Gray levels");
+    p.ylabel("No. of pixels");
+    p.xrange(0.0, 255.0);
+    p.drawCurve(bins, hist[0]).label("B").lineColor("blue").lineWidth(2);
+    p.drawCurve(bins, hist[1]).label("G").lineColor("green").lineWidth(2);
+    p.drawCurve(bins, hist[2]).label("R").lineColor("red").lineWidth(2);
+    p.legend().title(title).atOutsideTopRight();
+    return p;
+  };
+
+  Figure f1 = {{createPlot(h, "")}};
+  Canvas c1 = {{f1}};
+  c1.size(400, 300);
+  c1.save(out + "histogram_og" + suffix + ".png");
+
+  Figure f2 = {{createPlot(eqH, "")}};
+  Canvas c2 = {{f2}};
+  c2.size(400, 300);
+  c2.save(out + "histogram_eq" + suffix + ".png");
+
+  imwrite(out + "og" + suffix + ".png", src);
+  imwrite(out + "eq" + suffix + ".png", eq);
+}
 
 int main() {
   std::string assets = ROOT "/common/assets/";
   std::string out = ROOT "/tugas/tugas4/output/";
-  auto og = imread(assets + "tugas4-1.jpg");
-  auto pg = imread(assets + "tugas4-2.png");
-  if (og.empty() || pg.empty()) {
-    error("can't open or read file");
+
+  std::vector<std::string> inputs = {
+      "tugas4-2_600x600.jpg", "tugas4-1_600x600.jpg", "tugas4-4_1024x1856.png"};
+  for (size_t i = 0; i < inputs.size(); ++i) {
+    Mat src = imread(assets + inputs[i]);
+    if (src.empty()) {
+      error("can't open or read file: {}", inputs[i]);
+      continue;
+    }
+    processHistogram(src, out, i + 1);
+  }
+
+  Mat src = imread(assets + "tugas4-6_600x600.png");
+  if (src.empty())
     return -1;
-  }
+  imwrite(out + "og.png", src);
 
-  Mat gC1 = Mat::zeros(og.size(), CV_8UC1);
-  Mat gC3 = Mat::zeros(og.size(), CV_8UC3);
-  Mat pC1 = Mat::zeros(pg.size(), CV_8UC1);
-  Mat pC3 = Mat::zeros(pg.size(), CV_8UC3);
-  double L = (1 << og.elemSize1() * 8) - 1;
+  int ks[] = {7, 15, 31};
+  for (int k : ks) {
+    int r = k / 2;
+    std::string k_str = std::to_string(k);
 
-  Mat gLightness = gC1.clone();
-  Mat gAverage = gC1.clone();
-  Mat gLuminosity = gC1.clone();
-  for (auto y = 0; y < og.rows; ++y) {
-    for (auto x = 0; x < og.cols; ++x) {
-      Vec3b p = og.at<Vec3b>(y, x);
-      int z1 = (max({p[2], p[1], p[0]}) + min({p[2], p[1], p[0]})) / 2;
-      int z2 = (p[2] + p[1] + p[0]) / 3;
-      int z3 = (0.21 * p[2]) + (0.71 * p[1]) + (0.07 * p[0]);
-      gLightness.at<uchar>(y, x) = saturate_cast<uchar>(z1);
-      gAverage.at<uchar>(y, x) = saturate_cast<uchar>(z2);
-      gLuminosity.at<uchar>(y, x) = saturate_cast<uchar>(z3);
+    Mat boxZero = src.clone();
+    for (int y = 0; y < src.rows; ++y) {
+      for (int x = 0; x < src.cols; ++x) {
+        Vec3f sum = {0, 0, 0};
+        for (int ky = -r; ky <= r; ++ky) {
+          for (int kx = -r; kx <= r; ++kx) {
+            int ny = y + ky;
+            int nx = x + kx;
+            if (ny >= 0 && ny < src.rows && nx >= 0 && nx < src.cols) {
+              Vec3b p = src.at<Vec3b>(ny, nx);
+              for (int i = 0; i < 3; ++i)
+                sum[i] += p[i];
+            }
+          }
+        }
+        for (int i = 0; i < 3; ++i)
+          boxZero.at<Vec3b>(y, x)[i] = saturate_cast<uchar>(sum[i] / (k * k));
+      }
     }
-  }
+    imwrite(out + "box_zero_k" + k_str + ".png", boxZero);
 
-  Mat gNegative = gC3.clone();
-  for (auto y = 0; y < og.rows; ++y) {
-    for (auto x = 0; x < og.cols; ++x) {
-      Vec3b p = og.at<Vec3b>(y, x);
-      gNegative.at<Vec3b>(y, x) = Vec3b(L - p[0], L - p[1], L - p[2]);
+    Mat boxRep = src.clone();
+    for (int y = 0; y < src.rows; ++y) {
+      for (int x = 0; x < src.cols; ++x) {
+        Vec3f sum = {0, 0, 0};
+        for (int ky = -r; ky <= r; ++ky) {
+          for (int kx = -r; kx <= r; ++kx) {
+            int ny = std::clamp(y + ky, 0, src.rows - 1);
+            int nx = std::clamp(x + kx, 0, src.cols - 1);
+            Vec3b p = src.at<Vec3b>(ny, nx);
+            for (int i = 0; i < 3; ++i)
+              sum[i] += p[i];
+          }
+        }
+        for (int i = 0; i < 3; ++i)
+          boxRep.at<Vec3b>(y, x)[i] = saturate_cast<uchar>(sum[i] / (k * k));
+      }
     }
-  }
+    imwrite(out + "box_rep_k" + k_str + ".png", boxRep);
 
-  Mat gLogT = gC3.clone();
-  double c = 255.0 / std::log(1 + 255.0);
-  for (auto y = 0; y < og.rows; ++y) {
-    for (auto x = 0; x < og.cols; ++x) {
-      Vec3b p = og.at<Vec3b>(y, x);
-      gLogT.at<Vec3b>(y, x) =
-          Vec3b(saturate_cast<uchar>(c * std::log(1.0 + p[0])),
-                saturate_cast<uchar>(c * std::log(1.0 + p[1])),
-                saturate_cast<uchar>(c * std::log(1.0 + p[2])));
+    Mat boxMirror = src.clone();
+    for (int y = 0; y < src.rows; ++y) {
+      for (int x = 0; x < src.cols; ++x) {
+        Vec3f sum = {0, 0, 0};
+        for (int ky = -r; ky <= r; ++ky) {
+          for (int kx = -r; kx <= r; ++kx) {
+            int ny = mirror(y + ky, src.rows);
+            int nx = mirror(x + kx, src.cols);
+            Vec3b p = src.at<Vec3b>(ny, nx);
+            for (int i = 0; i < 3; ++i)
+              sum[i] += p[i];
+          }
+        }
+        for (int i = 0; i < 3; ++i)
+          boxMirror.at<Vec3b>(y, x)[i] = saturate_cast<uchar>(sum[i] / (k * k));
+      }
     }
+    imwrite(out + "box_mirror_k" + k_str + ".png", boxMirror);
   }
 
-  double gammas[3] = {0.4, 1.0, 3.0};
-  Mat gGamma[3] = {gC3.clone(), gC3.clone(), gC3.clone()};
-  for (auto y = 0; y < og.rows; ++y) {
-    for (auto x = 0; x < og.cols; ++x) {
-      Vec3b p = og.at<Vec3b>(y, x);
-      for (int g = 0; g < 3; ++g) {
-        gGamma[g].at<Vec3b>(y, x) =
-            Vec3b(saturate_cast<uchar>(L * std::pow(p[0] / L, gammas[g])),
-                  saturate_cast<uchar>(L * std::pow(p[1] / L, gammas[g])),
-                  saturate_cast<uchar>(L * std::pow(p[2] / L, gammas[g])));
+  double sigmas[] = {1.0, 2.5, 5.0};
+  for (double sigma : sigmas) {
+    int k = ceil(6 * sigma);
+    if (k % 2 == 0)
+      k++;
+    int r = k / 2;
+    std::string s_str = (sigma == 2.5) ? "2_5" : std::to_string((int)sigma);
+    std::vector<std::vector<double>> kernel(k, std::vector<double>(k));
+    double sum_k = 0;
+    for (int ky = -r; ky <= r; ++ky) {
+      for (int kx = -r; kx <= r; ++kx) {
+        double val = exp(-(kx * kx + ky * ky) / (2 * sigma * sigma)) /
+                     (2 * M_PI * sigma * sigma);
+        kernel[ky + r][kx + r] = val;
+        sum_k += val;
+      }
+    }
+    for (int i = 0; i < k; ++i)
+      for (int j = 0; j < k; ++j)
+        kernel[i][j] /= sum_k;
+    Mat gaussian = src.clone();
+    for (int y = 0; y < src.rows; ++y) {
+      for (int x = 0; x < src.cols; ++x) {
+        Vec3d sum = {0, 0, 0};
+        for (int ky = -r; ky <= r; ++ky) {
+          for (int kx = -r; kx <= r; ++kx) {
+            int ny = mirror(y + ky, src.rows);
+            int nx = mirror(x + kx, src.cols);
+            Vec3b p = src.at<Vec3b>(ny, nx);
+            double w = kernel[ky + r][kx + r];
+            for (int i = 0; i < 3; ++i)
+              sum[i] += p[i] * w;
+          }
+        }
+        for (int i = 0; i < 3; ++i)
+          gaussian.at<Vec3b>(y, x)[i] = saturate_cast<uchar>(sum[i]);
+      }
+    }
+    imwrite(out + "gaussian_s" + s_str + ".png", gaussian);
+  }
+
+  {
+    int k_comp = 21;
+    int r_comp = k_comp / 2;
+    double sigma_comp = 3.5;
+
+    Mat boxComp = src.clone();
+    for (int y = 0; y < src.rows; ++y) {
+      for (int x = 0; x < src.cols; ++x) {
+        Vec3f sum = {0, 0, 0};
+        for (int ky = -r_comp; ky <= r_comp; ++ky) {
+          for (int kx = -r_comp; kx <= r_comp; ++kx) {
+            int ny = mirror(y + ky, src.rows);
+            int nx = mirror(x + kx, src.cols);
+            Vec3b p = src.at<Vec3b>(ny, nx);
+            for (int i = 0; i < 3; ++i)
+              sum[i] += p[i];
+          }
+        }
+        for (int i = 0; i < 3; ++i)
+          boxComp.at<Vec3b>(y, x)[i] =
+              saturate_cast<uchar>(sum[i] / (k_comp * k_comp));
+      }
+    }
+    imwrite(out + "comp_box_1.png", boxComp);
+
+    std::vector<std::vector<double>> gKernel(k_comp,
+                                             std::vector<double>(k_comp));
+    double gSum = 0;
+    for (int ky = -r_comp; ky <= r_comp; ++ky) {
+      for (int kx = -r_comp; kx <= r_comp; ++kx) {
+        double v = exp(-(kx * kx + ky * ky) / (2 * sigma_comp * sigma_comp)) /
+                   (2 * M_PI * sigma_comp * sigma_comp);
+        gKernel[ky + r_comp][kx + r_comp] = v;
+        gSum += v;
+      }
+    }
+    Mat gaussComp = src.clone();
+    for (int y = 0; y < src.rows; ++y) {
+      for (int x = 0; x < src.cols; ++x) {
+        Vec3d sum = {0, 0, 0};
+        for (int ky = -r_comp; ky <= r_comp; ++ky) {
+          for (int kx = -r_comp; kx <= r_comp; ++kx) {
+            int ny = mirror(y + ky, src.rows);
+            int nx = mirror(x + kx, src.cols);
+            Vec3b p = src.at<Vec3b>(ny, nx);
+            sum += Vec3d(p[0], p[1], p[2]) * gKernel[ky + r_comp][kx + r_comp] /
+                   gSum;
+          }
+        }
+        for (int i = 0; i < 3; ++i)
+          gaussComp.at<Vec3b>(y, x)[i] = saturate_cast<uchar>(sum[i]);
+      }
+    }
+    imwrite(out + "comp_gauss_1.png", gaussComp);
+  }
+
+  Mat srcSharpen = imread(assets + "tugas4-3_800x800.png");
+  if (srcSharpen.empty())
+    srcSharpen = src;
+  imwrite(out + "og_sharpen.png", srcSharpen);
+
+  Mat lap4 = srcSharpen.clone();
+  int lapKernel[3][3] = {{0, 1, 0}, {1, -4, 1}, {0, 1, 0}};
+  for (int y = 0; y < srcSharpen.rows; ++y) {
+    for (int x = 0; x < srcSharpen.cols; ++x) {
+      Vec3f sum = {0, 0, 0};
+      for (int ky = -1; ky <= 1; ++ky) {
+        for (int kx = -1; kx <= 1; ++kx) {
+          int ny = mirror(y + ky, srcSharpen.rows);
+          int nx = mirror(x + kx, srcSharpen.cols);
+          Vec3b p = srcSharpen.at<Vec3b>(ny, nx);
+          int w = lapKernel[ky + 1][kx + 1];
+          for (int i = 0; i < 3; ++i)
+            sum[i] += p[i] * w;
+        }
+      }
+      for (int i = 0; i < 3; ++i) {
+        float res = static_cast<float>(srcSharpen.at<Vec3b>(y, x)[i]) - sum[i];
+        lap4.at<Vec3b>(y, x)[i] = saturate_cast<uchar>(res);
       }
     }
   }
+  imwrite(out + "sharpen_laplacian.png", lap4);
 
-  double rmin, rmax;
-  minMaxLoc(og.reshape(1), &rmin, &rmax);
-  Mat gContrast = gC3.clone();
-  for (auto y = 0; y < og.rows; ++y) {
-    for (auto x = 0; x < og.cols; ++x) {
-      Vec3b p = og.at<Vec3b>(y, x);
-      gContrast.at<Vec3b>(y, x) =
-          Vec3b(saturate_cast<uchar>((p[0] - rmin) * L / (rmax - rmin)),
-                saturate_cast<uchar>((p[1] - rmin) * L / (rmax - rmin)),
-                saturate_cast<uchar>((p[2] - rmin) * L / (rmax - rmin)));
-    }
-  }
-
-  Mat gBitplane[8];
-  for (int i = 0; i < 8; ++i)
-    gBitplane[i] = gC1.clone();
-  for (auto y = 0; y < og.rows; ++y) {
-    for (auto x = 0; x < og.cols; ++x) {
-      Vec3b p = og.at<Vec3b>(y, x);
-      int z3 = (0.21 * p[2]) + (0.71 * p[1]) + (0.07 * p[0]);
-      for (int i = 0; i < 8; ++i)
-        gBitplane[i].at<uchar>(y, x) = (z3 & (1 << i)) ? 255 : 0;
-    }
-  }
-
-  Mat pNegative = pC3.clone();
-  for (auto y = 0; y < pg.rows; ++y) {
-    for (auto x = 0; x < pg.cols; ++x) {
-      Vec3b p = pg.at<Vec3b>(y, x);
-      pNegative.at<Vec3b>(y, x) = Vec3b(L - p[0], L - p[1], L - p[2]);
-    }
-  }
-
-  Mat pLogT = pC3.clone();
-  for (auto y = 0; y < pg.rows; ++y) {
-    for (auto x = 0; x < pg.cols; ++x) {
-      Vec3b p = pg.at<Vec3b>(y, x);
-      pLogT.at<Vec3b>(y, x) =
-          Vec3b(saturate_cast<uchar>(c * std::log(1.0 + p[0])),
-                saturate_cast<uchar>(c * std::log(1.0 + p[1])),
-                saturate_cast<uchar>(c * std::log(1.0 + p[2])));
-    }
-  }
-
-  Mat pGamma[3] = {pC3.clone(), pC3.clone(), pC3.clone()};
-  for (auto y = 0; y < pg.rows; ++y) {
-    for (auto x = 0; x < pg.cols; ++x) {
-      Vec3b p = pg.at<Vec3b>(y, x);
-      for (int g = 0; g < 3; ++g) {
-        pGamma[g].at<Vec3b>(y, x) =
-            Vec3b(saturate_cast<uchar>(L * std::pow(p[0] / L, gammas[g])),
-                  saturate_cast<uchar>(L * std::pow(p[1] / L, gammas[g])),
-                  saturate_cast<uchar>(L * std::pow(p[2] / L, gammas[g])));
+  Mat lap8 = srcSharpen.clone();
+  int lap8Kernel[3][3] = {{1, 1, 1}, {1, -8, 1}, {1, 1, 1}};
+  for (int y = 0; y < srcSharpen.rows; ++y) {
+    for (int x = 0; x < srcSharpen.cols; ++x) {
+      Vec3f sum = {0, 0, 0};
+      for (int ky = -1; ky <= 1; ++ky) {
+        for (int kx = -1; kx <= 1; ++kx) {
+          int ny = mirror(y + ky, srcSharpen.rows);
+          int nx = mirror(x + kx, srcSharpen.cols);
+          Vec3b p = srcSharpen.at<Vec3b>(ny, nx);
+          int w = lap8Kernel[ky + 1][kx + 1];
+          for (int i = 0; i < 3; ++i)
+            sum[i] += p[i] * w;
+        }
+      }
+      for (int i = 0; i < 3; ++i) {
+        float res = static_cast<float>(srcSharpen.at<Vec3b>(y, x)[i]) - sum[i];
+        lap8.at<Vec3b>(y, x)[i] = saturate_cast<uchar>(res);
       }
     }
   }
+  imwrite(out + "sharpen_laplacian_8.png", lap8);
 
-  Mat gSubLSB = gC1.clone();
-  for (auto y = 0; y < og.rows; ++y) {
-    for (auto x = 0; x < og.cols; ++x) {
-      Vec3b p = og.at<Vec3b>(y, x);
-      int z3 = (0.21 * p[2]) + (0.71 * p[1]) + (0.07 * p[0]);
-      int lsb = z3 & 0xFE;
-      gSubLSB.at<uchar>(y, x) = (z3 != lsb) ? 255 : 0;
+  Mat sobel = srcSharpen.clone();
+  int hx[3][3] = {{-1, -2, -1}, {0, 0, 0}, {1, 2, 1}};
+  int hy[3][3] = {{-1, 0, 1}, {-2, 0, 2}, {-1, 0, 1}};
+  for (int y = 0; y < srcSharpen.rows; ++y) {
+    for (int x = 0; x < srcSharpen.cols; ++x) {
+      for (int i = 0; i < 3; ++i) {
+        float gx = 0, gy = 0;
+        for (int ky = -1; ky <= 1; ++ky) {
+          for (int kx = -1; kx <= 1; ++kx) {
+            int ny = mirror(y + ky, srcSharpen.rows);
+            int nx = mirror(x + kx, srcSharpen.cols);
+            uchar p = srcSharpen.at<Vec3b>(ny, nx)[i];
+            gx += p * hx[ky + 1][kx + 1];
+            gy += p * hy[ky + 1][kx + 1];
+          }
+        }
+        sobel.at<Vec3b>(y, x)[i] = saturate_cast<uchar>(abs(gx) + abs(gy));
+      }
     }
   }
+  imwrite(out + "sharpen_sobel.png", sobel);
 
-  Mat lowres, lowresUp;
-  resize(og, lowres, Size(), 0.5, 0.5, INTER_NEAREST);
-  resize(lowres, lowresUp, og.size(), 0, 0, INTER_NEAREST);
-  Mat gSubLowres = gC3.clone();
-  for (auto y = 0; y < og.rows; ++y) {
-    for (auto x = 0; x < og.cols; ++x) {
-      Vec3b p = og.at<Vec3b>(y, x);
-      Vec3b r = lowresUp.at<Vec3b>(y, x);
-      gSubLowres.at<Vec3b>(y, x) = Vec3b(saturate_cast<uchar>(p[0] - r[0]),
-                                         saturate_cast<uchar>(p[1] - r[1]),
-                                         saturate_cast<uchar>(p[2] - r[2]));
+  double sigma = 3.0;
+  int gk = ceil(6 * sigma);
+  if (gk % 2 == 0)
+    gk++;
+  int gr = gk / 2;
+  std::vector<std::vector<double>> gKernel(gk, std::vector<double>(gk));
+  double gSum = 0;
+  for (int ky = -gr; ky <= gr; ++ky) {
+    for (int kx = -gr; kx <= gr; ++kx) {
+      double val = exp(-(kx * kx + ky * ky) / (2 * sigma * sigma)) /
+                   (2 * M_PI * sigma * sigma);
+      gKernel[ky + gr][kx + gr] = val;
+      gSum += val;
     }
   }
+  for (int i = 0; i < gk; ++i)
+    for (int j = 0; j < gk; ++j)
+      gKernel[i][j] /= gSum;
 
-  Mat gSubAngio = gC3.clone();
-  for (auto y = 0; y < og.rows; ++y) {
-    for (auto x = 0; x < og.cols; ++x) {
-      Vec3b p = og.at<Vec3b>(y, x);
-      Vec3b neg = gNegative.at<Vec3b>(y, x);
-      gSubAngio.at<Vec3b>(y, x) = Vec3b(saturate_cast<uchar>(p[0] - neg[0]),
-                                        saturate_cast<uchar>(p[1] - neg[1]),
-                                        saturate_cast<uchar>(p[2] - neg[2]));
+  Mat unsharp = srcSharpen.clone();
+  Mat highboost = srcSharpen.clone();
+  double k_hb = 4.5;
+  for (int y = 0; y < srcSharpen.rows; ++y) {
+    for (int x = 0; x < srcSharpen.cols; ++x) {
+      Vec3d blurSum = {0, 0, 0};
+      for (int ky = -gr; ky <= gr; ++ky) {
+        for (int kx = -gr; kx <= gr; ++kx) {
+          int ny = mirror(y + ky, srcSharpen.rows);
+          int nx = mirror(x + kx, srcSharpen.cols);
+          Vec3b p = srcSharpen.at<Vec3b>(ny, nx);
+          blurSum += Vec3d(p[0], p[1], p[2]) * gKernel[ky + gr][kx + gr];
+        }
+      }
+      for (int i = 0; i < 3; ++i) {
+        double mask =
+            static_cast<double>(srcSharpen.at<Vec3b>(y, x)[i]) - blurSum[i];
+        unsharp.at<Vec3b>(y, x)[i] =
+            saturate_cast<uchar>(srcSharpen.at<Vec3b>(y, x)[i] + mask);
+        highboost.at<Vec3b>(y, x)[i] =
+            saturate_cast<uchar>(srcSharpen.at<Vec3b>(y, x)[i] + k_hb * mask);
+      }
     }
   }
-
-  Mat gAND = gC3.clone();
-  Mat gOR = gC3.clone();
-  Mat gXOR = gC3.clone();
-  for (auto y = 0; y < og.rows; ++y) {
-    for (auto x = 0; x < og.cols; ++x) {
-      Vec3b p = og.at<Vec3b>(y, x);
-      Vec3b neg = gNegative.at<Vec3b>(y, x);
-      gAND.at<Vec3b>(y, x) = Vec3b(p[0] & neg[0], p[1] & neg[1], p[2] & neg[2]);
-      gOR.at<Vec3b>(y, x) = Vec3b(p[0] | neg[0], p[1] | neg[1], p[2] | neg[2]);
-      gXOR.at<Vec3b>(y, x) = Vec3b(p[0] ^ neg[0], p[1] ^ neg[1], p[2] ^ neg[2]);
-    }
-  }
-
-  Mat gORBitplane = gC1.clone();
-  for (auto y = 0; y < og.rows; ++y) {
-    for (auto x = 0; x < og.cols; ++x) {
-      gORBitplane.at<uchar>(y, x) =
-          gBitplane[6].at<uchar>(y, x) | gBitplane[7].at<uchar>(y, x);
-    }
-  }
-
-  Mat gXORSelf = gC3.clone();
-  for (auto y = 0; y < og.rows; ++y) {
-    for (auto x = 0; x < og.cols; ++x) {
-      Vec3b p = og.at<Vec3b>(y, x);
-      gXORSelf.at<Vec3b>(y, x) = Vec3b(p[0] ^ p[0], p[1] ^ p[1], p[2] ^ p[2]);
-    }
-  }
-
-  Mat gANDMask = gC3.clone();
-  Mat mask = gC3.clone();
-  circle(mask, Point(og.cols / 2, og.rows / 2), og.rows / 3,
-         Scalar(255, 255, 255), -1);
-  for (auto y = 0; y < og.rows; ++y) {
-    for (auto x = 0; x < og.cols; ++x) {
-      Vec3b p = og.at<Vec3b>(y, x);
-      Vec3b m = mask.at<Vec3b>(y, x);
-      gANDMask.at<Vec3b>(y, x) = Vec3b(p[0] & m[0], p[1] & m[1], p[2] & m[2]);
-    }
-  }
-
-  Mat gXORGamma = gC3.clone();
-  for (auto y = 0; y < og.rows; ++y) {
-    for (auto x = 0; x < og.cols; ++x) {
-      Vec3b p = og.at<Vec3b>(y, x);
-      Vec3b gam = gGamma[0].at<Vec3b>(y, x);
-      gXORGamma.at<Vec3b>(y, x) =
-          Vec3b(p[0] ^ gam[0], p[1] ^ gam[1], p[2] ^ gam[2]);
-    }
-  }
-
-  imwrite(out + "grayscale_lightness.png", gLightness);
-  imwrite(out + "grayscale_average.png", gAverage);
-  imwrite(out + "grayscale_luminosity.png", gLuminosity);
-  imwrite(out + "negative.png", gNegative);
-  imwrite(out + "log_transform.png", gLogT);
-  imwrite(out + "gamma_04.png", gGamma[0]);
-  imwrite(out + "gamma_10.png", gGamma[1]);
-  imwrite(out + "gamma_30.png", gGamma[2]);
-  imwrite(out + "contrast_stretch.png", gContrast);
-  for (int i = 0; i < 8; ++i)
-    imwrite(out + "bitplane_" + std::to_string(i + 1) + ".png", gBitplane[i]);
-
-  imwrite(out + "pg_negative.png", pNegative);
-  imwrite(out + "pg_log_transform.png", pLogT);
-  imwrite(out + "pg_gamma_04.png", pGamma[0]);
-  imwrite(out + "pg_gamma_10.png", pGamma[1]);
-  imwrite(out + "pg_gamma_30.png", pGamma[2]);
-
-  imwrite(out + "subtract_og_vs_lsb.png", gSubLSB);
-  imwrite(out + "subtract_og_vs_lowres.png", gSubLowres);
-  imwrite(out + "subtract_og_vs_negative.png", gSubAngio);
-
-  imwrite(out + "bitwise_and.png", gAND);
-  imwrite(out + "bitwise_or.png", gOR);
-  imwrite(out + "bitwise_or_bitplane.png", gORBitplane);
-  imwrite(out + "bitwise_xor.png", gXOR);
-  imwrite(out + "bitwise_xor_self.png", gXORSelf);
-  imwrite(out + "bitwise_and_mask.png", gANDMask);
-  imwrite(out + "bitwise_xor_gamma.png", gXORGamma);
+  imwrite(out + "sharpen_unsharp.png", unsharp);
+  imwrite(out + "sharpen_highboost.png", highboost);
 
   return 0;
 }

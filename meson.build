@@ -15,4 +15,6 @@ add_project_arguments(
   '-Wno-c11-extensions',
   language: 'cpp')
 
+inc = include_directories('libs/sciplot')
+
 subdir('tugas')

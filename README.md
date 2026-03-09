@@ -37,6 +37,8 @@ meson compile -C build tugas2
 | #   | Folder   | Tugas                                             |
 | --- | -------- | ------------------------------------------------- |
 | 1   | `tugas2` | Menampilkan citra, resolusi (M×N), gray level (L) |
+| 2   | `tugas3` | Point Processing & Operasi Aritmatika-Logika      |
+| 3   | `tugas4` | Histogram Processing & Spatial Filtering          |
 
 ## Tools
 

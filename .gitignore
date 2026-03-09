@@ -3,3 +3,6 @@ build/
 result
 .direnv/
 reference/
+output/
+*.docx
+*.pdf
