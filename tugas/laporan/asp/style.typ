@@ -3,7 +3,7 @@
   font-size: 12pt,
   table-size: 10pt,
   lang: "id",
-  body
+  body,
 ) = {
   set text(font: font-family, size: font-size, lang: lang)
 

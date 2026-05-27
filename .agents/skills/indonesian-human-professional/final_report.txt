@@ -1,0 +1,206 @@
+# Indonesian Validator Architecture — Design Doc Plan (v6 Final)
+
+> **Scope:** Design document only. No implementation until user says go.
+
+---
+
+## Scope Boundary
+
+> [!IMPORTANT]
+> This skill covers the **language layer** only.
+
+| In scope (this skill) | Out of scope (other skills) |
+|---|---|
+| Word correctness (baku/tidak-baku) | Paper structure (Bab I-V ordering) |
+| EYD V spelling rules | Typst template formatting |
+| Anti-AI writing patterns | Page margins, fonts, headings |
+| Pasif Persona, rhythm, diction | Bibliography rendering |
+| Academic compliance (Bloom's verbs, APA 7th localized, AI disclosure) | Compilation (`typst compile`) |
+| Foreign word detection | Figure/table numbering |
+
+Paper structure and Typst formatting are handled by `typst-paper`. Both skills compose naturally when writing Indonesian academic papers — they trigger independently based on context.
+
+---
+
+## Convention
+
+- **File names:** English
+- **Code/variables:** English
+- **Rule content:** Indonesian where documenting language rules
+
+---
+
+## Open-Source Resources
+
+| Resource | Repo | Format | Covers | License |
+|---|---|---|---|---|
+| Baku/Tidak-Baku mapping | [lantip/baku-tidak-baku](https://github.com/lantip/baku-tidak-baku) | JSON | L1 | ABRMS |
+| KBBI full dictionary | [aryakdaniswara/kbbi-dataset-kbbi-v](https://github.com/aryakdaniswara/kbbi-dataset-kbbi-v) | JSON + CSV | L3, L9 | Check repo |
+| EYD V structured rules | [gipsterya/eyd](https://github.com/gipsterya/eyd/tree/main/docs) | Markdown (by topic) | L4 | CC BY-SA 4.0 |
+| Sastrawi root words | Bundled with PySastrawi | TXT (~30k) | L2 | MIT |
+
+> [!NOTE]
+> All open-source resources must be acknowledged in the skill README's "Acknowledgments" section with repo links and license info.
+
+### Bloom's KKO (manual creation)
+
+Bloom's taxonomy KKO tables (C1-C6 cognitive verbs in Indonesian) are well-documented online. We'll create `data/blooms_verbs.json` from these standard tables during Phase 0.
+
+---
+
+## Tool Stack
+
+| Tool | Install | Layers |
+|---|---|---|
+| **PySastrawi** | `pip install PySastrawi` | L2 (stemming) |
+| **Stanza** | `pip install stanza` + `stanza.download('id')` | L4, L6, L7, L8 (POS, tokenization) |
+
+Everything else is regex or JSON lookup. No other dependencies.
+
+---
+
+## 3 Domains
+
+| Domain | Scope |
+|---|---|
+| `bahasa-core` | EYD V, KBBI, baku, prefix rules, foreign words |
+| `anti-ai-style` | Pasif Persona, inversions, rhythm, heritage diction |
+| `academic-compliance` | Bloom's verbs, APA 7th localized, AI disclosure |
+
+## 8-Layer Pipeline
+
+| Layer | Domain | Tool | Input → Output |
+|---|---|---|---|
+| L1 | `bahasa-core` | lantip JSON | Word → corrected word |
+| L2 | `bahasa-core` | PySastrawi | Word → root word |
+| L3 | `bahasa-core` | KBBI dataset | Root → baku/tidak-baku |
+| L4 | `bahasa-core` | Stanza POS + gipsterya rules | Token → di-spacing verdict |
+| L6 | `anti-ai-style` | banned_phrases.json + Stanza | Sentence → flagged phrases |
+| L7 | `anti-ai-style` | Stanza + word count | Paragraph → variance score |
+| L8 | `anti-ai-style` | Stanza POS + pattern | Sentence → passive type |
+| L9 | `bahasa-core` | Inverse KBBI check | Word → foreign/native tag |
+
+### Layer Dependencies
+
+```
+Group A (word-level, parallel): L1, L2→L3, L2→L9
+Group B (sentence-level, parallel): L4, L6, L7, L8
+L8 also depends on L2 (needs verb root)
+Groups A and B run concurrently after Stanza init
+```
+
+---
+
+## File Structure
+
+```
+.agents/skills/indonesian-human-professional/
+├── SKILL.md                          # Module router
+├── _staging/                         # Temp: old files pending cleanup
+│   ├── SKILL.1.md, SKILL.2.md       # Old SKILL versions
+│   ├── sk-eyd-v.md                   # Raw EYD dump (replaced by gipsterya)
+│   ├── tata-bahasa-baku-*.md         # Raw 19k-line dump
+│   └── *.pdf (×3)                    # PDFs to move to workspace root
+├── docs/
+│   ├── architecture.md               # Design doc (this plan → full doc)
+│   └── dependency-graph.typ          # Typst fletcher → PNG
+├── references/
+│   ├── modules/
+│   │   ├── BAHASA_CORE.md
+│   │   ├── ANTI_AI_STYLE.md
+│   │   ├── ACADEMIC_COMPLIANCE.md
+│   │   └── WORKFLOW.md
+│   ├── EYD_V_RULES.md               # From gipsterya/eyd (kata-depan, kata-turunan)
+│   └── MORPHOLOGY.md                # Curated from tata-bahasa-baku
+├── scripts/
+│   ├── validate_baku.py              # L1+L2+L3
+│   ├── check_eyd_spacing.py          # L4
+│   ├── scan_ai_patterns.py           # L6
+│   ├── analyze_rhythm.py             # L7
+│   ├── classify_passive.py           # L8
+│   ├── tag_foreign_words.py          # L9
+│   └── run_all.py                    # Pipeline runner
+├── data/
+│   ├── baku_tidak_baku.json          # From lantip (merged)
+│   ├── kbbi_roots.json               # From aryakdaniswara
+│   ├── banned_phrases.json           # Seeded from SKILL.md Standards A+B
+│   ├── heritage_words.json           # From SKILL.md Rule VIII
+│   └── blooms_verbs.json             # KKO C1-C6
+├── examples/
+│   ├── golden_test_cases.md
+│   └── adversarial_samples/          # Placeholder
+└── evals/
+    └── eval_accuracy.py
+```
+
+---
+
+## Atomic Flash Implementation Guide
+
+### Phase 0: Data Setup
+
+| Step | Task | Verify |
+|---|---|---|
+| 0.1 | Download + merge lantip baku JSONs → `data/baku_tidak_baku.json` | `python -c "import json; print(len(json.load(open('data/baku_tidak_baku.json'))))"` |
+| 0.2 | Download KBBI dataset → `data/kbbi_roots.json` | Same pattern |
+| 0.3 | Seed `data/banned_phrases.json` from SKILL.md Standards A+B | Same pattern |
+| 0.4 | Create `data/heritage_words.json` from SKILL.md Rule VIII | Same pattern |
+| 0.5 | Create `data/blooms_verbs.json` from KKO tables | Same pattern |
+| 0.6 | Grab `kata-depan.md` + `kata-turunan.md` from gipsterya/eyd → `references/EYD_V_RULES.md` | File exists, < 300 lines |
+
+### Phase 1: Word-Level Scripts
+
+| Step | Task | Test Input | Expected Output |
+|---|---|---|---|
+| 1.1 | `validate_baku.py` (L1+L2+L3) | `"Aktifitas menganalisa"` | Corrections: Aktivitas, analisis |
+| 1.2 | `check_eyd_spacing.py` (L4) | `"dimakan di rumah"` | Both correct |
+| 1.3 | `tag_foreign_words.py` (L9) | `"Menggunakan framework"` | framework = foreign |
+
+### Phase 2: Sentence-Level Scripts
+
+| Step | Task | Test Input | Expected Output |
+|---|---|---|---|
+| 2.1 | `scan_ai_patterns.py` (L6) | AI-ism sentence | Flagged phrases |
+| 2.2 | `analyze_rhythm.py` (L7) | Monotone paragraph | Low variance warning |
+| 2.3 | `classify_passive.py` (L8) | `"Data dianalisis oleh kami"` | Suggest Pasif Persona |
+
+### Phase 3: Integration
+
+| Step | Task | Verify |
+|---|---|---|
+| 3.1 | `run_all.py` (pipeline runner) | `python scripts/run_all.py input.txt` |
+| 3.2 | `golden_test_cases.md` (24 cases) | Manual review |
+
+### Phase 4: Documentation
+
+| Step | Task | Verify |
+|---|---|---|
+| 4.1 | `docs/architecture.md` | Manual review |
+| 4.2 | `docs/dependency-graph.typ` (fletcher) | `typst compile → PNG` |
+| 4.3 | Curate `references/MORPHOLOGY.md` from staging | < 500 lines |
+| 4.4 | Module references (BAHASA_CORE, ANTI_AI_STYLE, ACADEMIC_COMPLIANCE, WORKFLOW) | Manual review |
+| 4.5 | Rewrite [SKILL.md](file:///home/shure/Documents/learning/playground/.agents/skills/typst-paper/SKILL.md) as module router | Compare to typst-paper structure |
+
+### Phase 5: Cleanup
+
+| Step | Task | Verify |
+|---|---|---|
+| 5.1 | Move PDFs from `_staging/` to workspace root | `ls _staging/*.pdf` empty |
+| 5.2 | Delete `_staging/` after all curation is done | Folder gone |
+
+---
+
+## Verification Strategy
+
+- **Method A:** 24 golden test cases (8 per domain)
+- **Method B:** Adversarial samples (placeholder, user adds later)
+- **Method C:** Dependency graph (Typst fletcher → PNG, check for circular deps)
+
+---
+
+## Flash Guard Rails
+
+1. **One script per prompt** — atomic tasks only
+2. **Always @mention:** this plan + SKILL.md + relevant module reference
+3. **Verify-before-next** — run each script on test input before proceeding
+4. **Plan stays in context** — keep [implementation_plan.md](file:///home/shure/.gemini/antigravity/brain/e6e21c70-5d8e-4be8-87e2-0ed65121e39a/implementation_plan.md) open

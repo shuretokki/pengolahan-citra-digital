@@ -1,0 +1,15 @@
+{
+  "suggested": [
+    "seiring berjalannya waktu",
+    "bahwasanya",
+    "menurut hemat penulis",
+    "adapun",
+    "paparan",
+    "amatan"
+  ],
+  "replacements": {
+    "hasil": "paparan",
+    "observasi": "amatan",
+    "skripsi": "tugas akhir"
+  }
+}

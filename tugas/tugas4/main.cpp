@@ -75,21 +75,35 @@ void processHistogram(const Mat &src, const std::string &out, int index) {
     p.xlabel("Gray levels");
     p.ylabel("No. of pixels");
     p.xrange(0.0, 255.0);
-    p.drawCurve(bins, hist[0]).label("B").lineColor("blue").lineWidth(2);
-    p.drawCurve(bins, hist[1]).label("G").lineColor("green").lineWidth(2);
-    p.drawCurve(bins, hist[2]).label("R").lineColor("red").lineWidth(2);
-    p.legend().title(title).atOutsideTopRight();
+    p.grid().show().lineColor("#eeeeee").lineWidth(2);
+    p.border().clear().top().bottom().left().right();
+    p.drawStepsFilled(bins, hist[0])
+        .label("B")
+        .fillColor("#3498db")
+        .fillIntensity(0.5)
+        .borderHide();
+    p.drawStepsFilled(bins, hist[1])
+        .label("G")
+        .fillColor("#2ecc71")
+        .fillIntensity(0.5)
+        .borderHide();
+    p.drawStepsFilled(bins, hist[2])
+        .label("R")
+        .fillColor("#e74c3c")
+        .fillIntensity(0.5)
+        .borderHide();
+    p.legend().title(title).atTopRight().displayVertical().transparent();
     return p;
   };
 
   Figure f1 = {{createPlot(h, "")}};
   Canvas c1 = {{f1}};
-  c1.size(400, 300);
+  c1.size(400, 400);
   c1.save(out + "histogram_og" + suffix + ".png");
 
   Figure f2 = {{createPlot(eqH, "")}};
   Canvas c2 = {{f2}};
-  c2.size(400, 300);
+  c2.size(400, 400);
   c2.save(out + "histogram_eq" + suffix + ".png");
 
   imwrite(out + "og" + suffix + ".png", src);

@@ -1,0 +1,25 @@
+{
+  "version": 1,
+  "skills": {
+    "anti-ai-writing": {
+      "source": "cdeistopened/skill-stack",
+      "sourceType": "github",
+      "computedHash": "4ea3dc754baef19122a9599463810a1004524bc211c8c22cd62b8c78e8340415"
+    },
+    "eos-style": {
+      "source": "neurofoo/agent-skills",
+      "sourceType": "github",
+      "computedHash": "896a052ecd9e7c2ed84cce3c1a32ceac80ea3d381e6884005001dc4193d9fc93"
+    },
+    "notebooklm": {
+      "source": "pleaseprompto/notebooklm-skill",
+      "sourceType": "github",
+      "computedHash": "2902e68071784c81597644309206b6b127e49b62a145cc9cbbbb73bfaeeeb86c"
+    },
+    "typst-paper": {
+      "source": "bahayonghang/academic-writing-skills",
+      "sourceType": "github",
+      "computedHash": "49dd4d01e3302ac6ac6a6dde45a5734421ad329c8bdf903937d1ddd1d90ff524"
+    }
+  }
+}

@@ -1,10 +1,10 @@
 #let title-page(
   title: "",
   course: "",
-  lecturer: "",
-  nidn: "",
+  lecturer: (name: "", id: ""),
   students: (),
   program: "",
+  department: "",
   faculty: "",
   university: "",
   year: "",
@@ -18,13 +18,31 @@
   label-students: "",
   label-program: "",
   label-faculty: "",
-  body
+  label-dept: "",
+  label-by: "",
+  type: "",
+  type-label: "",
+  type-pos: "bottom",
+  is-formal: false,
+  body,
 ) = {
+  let title-text = text(size: cover-title-size, weight: "bold")[#upper(title)]
+  let type-text = text(size: 14pt, weight: "bold", style: if is-formal { "italic" } else { "normal" })[#upper(
+    type-label,
+  )]
+
   page(numbering: none)[
+    #set text(font: ("Times New Roman", "Liberation Serif"))
     #align(center)[
       #v(cover-top)
 
-      #text(size: cover-title-size, weight: "bold")[#upper(title)]
+      #if type-pos == "top" [
+        #if type-label != "" { type-text + v(0.1cm) }
+        #title-text
+      ] else [
+        #title-text
+        #if type-label != "" { v(0.1cm) + type-text }
+      ]
 
       #v(1fr)
 
@@ -38,37 +56,49 @@
         #v(cover-gap-course-lecturer)
       ]
 
-      #if lecturer != "" [
+      #if lecturer.name != "" [
         #label-lecturer\
-        #text(weight: "bold", style: "italic", underline(lecturer))\
-        #if nidn != "" [#nidn]
+        #text(weight: "bold", style: "italic", underline(lecturer.name))\
+        #if lecturer.id != "" [#lecturer.id]
         #v(cover-gap-lecturer-students)
       ]
 
-      #if students.len() > 0 [
-        #label-students\
-        #if students.len() == 1 {
+      #if is-formal [
+        #text(size: 12pt)[#label-by] \
+        #v(0.2cm)
+        #if students.len() > 0 {
           let s = students.first()
-          [#text(weight: "bold", style: "italic")[#underline(s.name)]\ #s.id]
-        } else {
-          align(center)[
-            #table(
-              columns: (auto, auto),
-              stroke: none,
-              align: (left, right),
-              inset: 4pt,
-              ..students.map(s => (s.name, s.id)).flatten()
-            )
-          ]
+          text(size: 12pt, weight: "bold")[#upper(s.name)]
+          linebreak()
+          text(size: 12pt, weight: "bold")[NIM #s.id]
         }
+      ] else [
+        #if students.len() > 0 [
+          #label-students\
+          #if students.len() == 1 {
+            let s = students.first()
+            [#text(weight: "bold", style: "italic")[#underline(s.name)]\ #s.id]
+          } else {
+            align(center)[
+              #table(
+                columns: (auto, auto),
+                stroke: none,
+                align: (left, right),
+                inset: 4pt,
+                ..students.map(s => (s.name, s.id)).flatten(),
+              )
+            ]
+          }
+        ]
       ]
 
       #v(1fr)
 
       #text(weight: "bold")[
-        #if program != "" [#label-program #upper(program)\ ]
-        #if faculty != "" [#label-faculty #upper(faculty)\ ]
         #if university != "" [#upper(university)\ ]
+        #if faculty != "" [#label-faculty #upper(faculty)\ ]
+        #if department != "" [#label-dept #upper(department)\ ]
+        #if program != "" [#label-program #upper(program)\ ]
         #if year != "" [#year]
       ]
     ]

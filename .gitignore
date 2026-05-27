@@ -6,3 +6,4 @@ reference/
 output/
 *.docx
 *.pdf
+.venv/

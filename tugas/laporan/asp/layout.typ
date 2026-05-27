@@ -1,15 +1,12 @@
 #let layout(
   paper: "a4",
-  margin-top: 2.5cm,
-  margin-bottom: 2.5cm,
-  margin-left: 2.5cm,
-  margin-right: 2.5cm,
+  margin: (top: 2.5cm, bottom: 2.5cm, left: 2.5cm, right: 2.5cm),
   number-align: center,
-  body
+  body,
 ) = {
   set page(
     paper: paper,
-    margin: (top: margin-top, bottom: margin-bottom, left: margin-left, right: margin-right),
+    margin: margin,
     number-align: number-align,
   )
 

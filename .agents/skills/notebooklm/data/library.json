@@ -1,0 +1,26 @@
+{
+  "notebooks": {
+    "digital-image-processing-reference-(g&w-4th-ed)": {
+      "id": "digital-image-processing-reference-(g&w-4th-ed)",
+      "url": "https://notebooklm.google.com/notebook/e6372355-95c4-40c7-9463-694a23c8ea7b",
+      "name": "Digital Image Processing Reference (G&W 4th Ed)",
+      "description": "Contains chapters 1\u201312 and bibliography of Gonzales & Woods 4th Edition.",
+      "topics": [
+        "Image Restoration",
+        "Morphological Processing",
+        "Frequency Domain Filtering",
+        "Intensity Transformations",
+        "Spatial Filtering"
+      ],
+      "content_types": [],
+      "use_cases": [],
+      "tags": [],
+      "created_at": "2026-03-31T22:25:57.017917",
+      "updated_at": "2026-03-31T22:25:57.017925",
+      "use_count": 0,
+      "last_used": null
+    }
+  },
+  "active_notebook_id": "digital-image-processing-reference-(g&w-4th-ed)",
+  "updated_at": "2026-03-31T22:25:57.017929"
+}

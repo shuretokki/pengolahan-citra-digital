@@ -30,3 +30,14 @@ executable(
   include_directories: inc,
   install: true,
 )
+
+executable(
+  'tugas5',
+  'tugas5/main.cpp',
+  dependencies: [
+    dependency('spdlog'),
+    dependency('opencv4')
+  ],
+  include_directories: inc,
+  install: true,
+)

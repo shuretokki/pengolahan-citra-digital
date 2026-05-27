@@ -9,7 +9,6 @@
       systems = [
         "x86_64-linux"
       ];
-
       perSystem = { system, ... }:
         let
           pkgs = import inputs.nixpkgs {
@@ -44,12 +43,17 @@
             nativeBuildInputs = [ pkgs.meson pkgs.ninja pkgs.pkg-config ];
             buildInputs = [ pkgs.spdlog opencvGtk pkgs.gnuplot ];
             packages = with pkgs; [
-              clang-tools gdb valgrind cppcheck ccache
-              texlive.combined.scheme-full typst corefonts
-              ghostscript compress gnuplot
+              clang-tools gdb valgrind cppcheck ccache typst corefonts
+              noto-fonts montserrat ibm-plex jetbrains-mono
+              ghostscript compress gnuplot typst-live just
+              nodejs_22 bun corepack oxipng uv python314
             ];
-            shellHook = ''
-              export TYPST_FONT_PATHS="${pkgs.corefonts}/share/fonts/truetype"
+            shellHook = let
+              fonts = with pkgs; [
+                corefonts noto-fonts montserrat ibm-plex jetbrains-mono
+              ];
+            in ''
+              export TYPST_FONT_PATHS="./fonts:${pkgs.lib.makeSearchPath "share/fonts" fonts}"
             '';
           };
       };
